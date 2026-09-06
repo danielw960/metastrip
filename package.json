@@ -1,0 +1,17 @@
+{
+  "name": "metastrip",
+  "version": "0.1.0",
+  "description": "Strip identifying metadata (EXIF, text comments, timestamps) from image files",
+  "type": "module",
+  "bin": {
+    "metastrip": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "author": "danielw960",
+  "engines": {
+    "node": ">=18"
+  }
+}
