@@ -73,6 +73,15 @@ node dist/cli.js weird-export.png --lenient
 If you install it as a package with a `bin` entry, the same commands work as
 `metastrip photo.png` instead of `node dist/cli.js photo.png`.
 
+## tests
+
+```
+npm test
+```
+
+runs the unit tests in `src/png.test.ts` against hand-built PNG buffers
+(Node's built-in test runner, no extra dependencies).
+
 ## current limitations
 
 Only PNG is supported so far. JPEG (APP1/EXIF, APP13/IPTC, COM segments) is
