@@ -1,13 +1,43 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { extname } from 'node:path';
-import { stripMetadata, PngFormatError } from './png.js';
+import { stripMetadata as stripPng, PngFormatError } from './png.js';
+import { stripMetadata as stripJpeg, JpegFormatError, markerName } from './jpeg.js';
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+type Format = 'png' | 'jpeg';
+
+function detectFormat(buf: Buffer): Format | undefined {
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(PNG_SIGNATURE)) {
+    return 'png';
+  }
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8) {
+    return 'jpeg';
+  }
+  return undefined;
+}
+
+interface StripOutcome {
+  output: Buffer;
+  removed: { label: string; bytes: number }[];
+  warnings: string[];
+}
+
+function stripFile(format: Format, buf: Buffer, lenient: boolean): StripOutcome {
+  if (format === 'png') {
+    const { output, removed, warnings } = stripPng(buf, { lenient });
+    return { output, warnings, removed: removed.map((r) => ({ label: r.type, bytes: r.bytes })) };
+  }
+  const { output, removed, warnings } = stripJpeg(buf, { lenient });
+  return { output, warnings, removed: removed.map((r) => ({ label: markerName(r.marker), bytes: r.bytes })) };
+}
 
 function printUsage(): void {
-  console.error(`usage: metastrip <input.png> [-o output.png] [--lenient] [--dry-run]
+  console.error(`usage: metastrip <input.png|input.jpg> [-o output] [--lenient] [--dry-run]
 
   -o, --output <path>   write the stripped image here (default: <input>.stripped<ext>)
-      --lenient         tolerate structural problems (bad CRCs, truncated chunks)
+      --lenient         tolerate structural problems (bad CRCs, truncated chunks/segments)
                         instead of stopping at the first one
       --dry-run         report what would be removed without writing a file
   -h, --help            show this message`);
@@ -84,25 +114,25 @@ function main(): void {
   }
 
   const buf = readFileSync(args.input);
-  const looksLikePng = buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50;
-  if (!looksLikePng) {
-    console.error('metastrip: only PNG files are supported right now (JPEG support is planned)');
+  const format = detectFormat(buf);
+  if (format === undefined) {
+    console.error('metastrip: unrecognized file format (only PNG and JPEG are supported)');
     process.exitCode = 1;
     return;
   }
 
   try {
-    const { output, removed, warnings } = stripMetadata(buf, { lenient: args.lenient });
+    const { output, removed, warnings } = stripFile(format, buf, args.lenient);
 
     for (const warning of warnings) {
       console.error(`metastrip: warning: ${warning}`);
     }
 
     if (removed.length === 0) {
-      console.log('no metadata chunks found');
+      console.log('no metadata found');
     } else {
-      for (const chunk of removed) {
-        console.log(`removed ${chunk.type} (${chunk.bytes} bytes)`);
+      for (const item of removed) {
+        console.log(`removed ${item.label} (${item.bytes} bytes)`);
       }
     }
 
@@ -112,7 +142,7 @@ function main(): void {
       console.log(`wrote ${outPath}`);
     }
   } catch (err) {
-    if (err instanceof PngFormatError) {
+    if (err instanceof PngFormatError || err instanceof JpegFormatError) {
       console.error(`metastrip: ${err.message}`);
       console.error('metastrip: pass --lenient to continue past structural problems');
       process.exitCode = 1;
