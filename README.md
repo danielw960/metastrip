@@ -82,8 +82,9 @@ If you install it as a package with a `bin` entry, the same commands work as
 npm test
 ```
 
-runs the unit tests in `src/png.test.ts` against hand-built PNG buffers
-(Node's built-in test runner, no extra dependencies).
+runs the unit tests in `src/png.test.ts` and `src/jpeg.test.ts` against
+hand-built image buffers (Node's built-in test runner, no extra
+dependencies).
 
 ## current limitations
 
